@@ -1,0 +1,128 @@
+name: Build Flatpak release
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: flatpak-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free runner disk space before installing Flatpak dependencies
+        run: sudo rm -rf --one-file-system -- /usr/local/lib/android /usr/share/dotnet /opt/hostedtoolcache/CodeQL
+
+      - name: Check out sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install Flatpak build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends flatpak flatpak-builder xvfb xauth
+          flatpak --version
+          flatpak-builder --version
+
+      - name: Install Flatpak dependencies from the manifest
+        run: |
+          sudo flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          # Install system dependencies with privileges before the Action runs as the runner user.
+          sudo flatpak-builder --install-deps-only --install-deps-from=flathub \
+            --arch=x86_64 --state-dir="$RUNNER_TEMP/flatpak-dependencies" \
+            "$RUNNER_TEMP/flatpak-dependency-build" kakaotalk/com.kakao.KakaoTalk.json
+
+      - name: Prepare bundle directories
+        run: mkdir -p .build/kakaotalk
+
+      - name: Build KakaoTalk
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3
+        with:
+          manifest-path: kakaotalk/com.kakao.KakaoTalk.json
+          bundle: .build/KakaoTalk.flatpak
+          branch: stable
+          arch: x86_64
+          build-dir: .build/kakaotalk/build
+          repo-dir: .build/kakaotalk/repo
+          state-dir: .flatpak-builder/kakaotalk
+          cache: false
+          keep-build-dirs: false
+          build-debug-bundle: false
+          upload-artifact: false
+          run-tests: false
+
+      - name: Transfer only bundles to the publish runner
+        id: bundles
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: flatpak-bundles-kakaotalk
+          path: .build/KakaoTalk.flatpak
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          archive: true
+
+      - name: Remove local build files
+        if: always()
+        run: rm -rf -- .build .flatpak-builder
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Check out only the publish script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Download bundles from this build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: flatpak-bundles-*
+          merge-multiple: true
+          path: .build
+          digest-mismatch: error
+
+      - name: Publish and retain only the new release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/publish-release.sh
+
+  cleanup:
+    needs: [build, publish]
+    if: always() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Delete transfer artifacts even if publishing failed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          artifact_list=$(mktemp)
+          trap 'rm -f -- "$artifact_list"' EXIT
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.name == "flatpak-bundles" or (.name | startswith("flatpak-bundles-"))) | .id' > "$artifact_list"
+          while read -r artifact_id; do
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+          done < "$artifact_list"

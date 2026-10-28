@@ -1,0 +1,15 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Control Panel\Desktop]
+"LogPixels"=dword:00000060
+
+[HKEY_CURRENT_USER\Software\Wine\Direct3D]
+"renderer"="gl"
+
+[HKEY_CURRENT_USER\Software\Wine\Drivers]
+"Graphics"="x11"
+
+[HKEY_CURRENT_USER\Software\Wine\X11 Driver]
+"Decorated"="Y"
+"Managed"="Y"
+"GrabFullscreen"="N"

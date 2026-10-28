@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=KakaoTalk
+Name[ko]=카카오톡
+Keywords=kakaotalk;카카오톡;
+Comment=KakaoTalk for Windows using Wine
+Exec=kakaotalk
+Icon=com.kakao.KakaoTalk
+Terminal=false
+Categories=Network;InstantMessaging;
+StartupWMClass=KakaoTalk.exe

@@ -1,0 +1,52 @@
+{
+  "app-id": "com.kakao.KakaoTalk",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "26.08",
+  "sdk": "org.freedesktop.Sdk",
+  "base": "org.winehq.Wine",
+  "base-version": "stable-26.08",
+  "default-branch": "stable",
+  "command": "kakaotalk",
+  "inherit-extensions": [
+    "org.winehq.Wine.gecko",
+    "org.winehq.Wine.mono"
+  ],
+  "finish-args": [
+    "--share=ipc",
+    "--share=network",
+    "--socket=x11",
+    "--socket=pulseaudio",
+    "--device=dri",
+    "--allow=multiarch",
+    "--allow=devel",
+    "--filesystem=xdg-download"
+  ],
+  "modules": [
+    {
+      "name": "kakaotalk",
+      "buildsystem": "simple",
+      "build-commands": [
+        "sha256sum --check KakaoTalk_Setup.exe.sha256",
+        "install -Dm644 KakaoTalk_Setup.exe /app/share/kakaotalk/KakaoTalk_Setup.exe",
+        "install -Dm644 KakaoTalk_Setup.exe.sha256 /app/share/kakaotalk/KakaoTalk_Setup.exe.sha256",
+        "install -Dm644 kakaotalk.reg /app/share/kakaotalk/kakaotalk.reg",
+        "install -Dm755 kakaotalk.sh /app/bin/kakaotalk",
+        "install -Dm644 com.kakao.KakaoTalk.desktop /app/share/applications/com.kakao.KakaoTalk.desktop",
+        "install -Dm644 com.kakao.KakaoTalk.png /app/share/icons/hicolor/256x256/apps/com.kakao.KakaoTalk.png"
+      ],
+      "sources": [
+        {
+          "type": "file",
+          "url": "https://lk.kakaocdn.net/talkpc/talk/win32/x64/KakaoTalk_Setup.exe",
+          "sha256": "c60275b8de2e24b9e9153c1dcdaf6a4620064c249ff58903482ca87caab26275",
+          "dest-filename": "KakaoTalk_Setup.exe"
+        },
+        { "type": "file", "path": "KakaoTalk_Setup.exe.sha256" },
+        { "type": "file", "path": "kakaotalk.reg" },
+        { "type": "file", "path": "kakaotalk.sh" },
+        { "type": "file", "path": "com.kakao.KakaoTalk.desktop" },
+        { "type": "file", "path": "com.kakao.KakaoTalk.png" }
+      ]
+    }
+  ]
+}
